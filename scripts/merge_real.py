@@ -109,7 +109,7 @@ def main():
 
     if not productos:
         raise SystemExit("ERROR: ningún producto con precio real; no se genera salida.")
-    detalle = ", ".join(f"{c.title()} {reales[c]} prod." for c in cadenas_hoy)
+    detalle = ", ".join(f"{c.title()} {reales[c]}" for c in cadenas_hoy)
     sitios_web = {"carrefour": "carrefour.com.ar", "disco": "disco.com.ar",
                   "vea": "vea.com.ar", "changomas": "masonline.com.ar",
                   "cordiez": "cordiez.com.ar"}
@@ -119,8 +119,9 @@ def main():
         "actualizado": HOY,
         "demo": False,
         "nota": (
-            f"Precios REALES {HOY} (tiendas online): {detalle}. "
-            "Solo cadenas con precios reales verificados; sin valores de ejemplo."
+            f"Precios REALES {HOY} (tiendas online): {detalle} productos. "
+            "Solo cadenas con precios reales verificados; sin valores de ejemplo. "
+            "Precios de referencia: pueden variar en sucursal."
         ),
         "fuentes": {c: f"real {HOY} ({sitios_web[c]})" for c in cadenas_hoy},
         "sucursales": sucursales,
