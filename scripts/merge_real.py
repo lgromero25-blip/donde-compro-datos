@@ -46,7 +46,7 @@ def cargar_opcional(nombre):
 
 
 def main():
-    demo = cargar(os.path.join("..", "hosting", "precios.json"))
+    demo = cargar("base-demo.json")
     v4 = cargar("precios-v4.json")
     rcar = cargar("precios-real-carrefour.json")
     rcen = cargar("precios-real-cencosud.json")
