@@ -1,0 +1,77 @@
+name: Actualizar precios reales
+
+# Lee precios reales de las tiendas online (Carrefour, Disco, Vea, Chango Más
+# via MasOnline, Cordiez) y regenera precios.json. Regla: solo cadenas con
+# precios reales verificados; si una cadena falla ese día, queda fuera del
+# JSON en vez de publicar valores viejos o de ejemplo.
+
+on:
+  schedule:
+    # 07:00 ART (UTC-3) todos los días
+    - cron: "0 10 * * *"
+  workflow_dispatch: {}
+
+permissions:
+  contents: write
+
+jobs:
+  precios:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Leer precios reales (4 cadenas en paralelo)
+        run: |
+          cd scripts
+          python3 leer_carrefour.py & P1=$!
+          python3 leer_cencosud.py & P2=$!
+          python3 leer_masonline.py & P3=$!
+          python3 leer_cordiez.py & P4=$!
+          wait $P1; R1=$?
+          wait $P2; R2=$?
+          wait $P3; R3=$?
+          wait $P4; R4=$?
+          echo "exit codes: carrefour=$R1 cencosud=$R2 masonline=$R3 cordiez=$R4"
+          # Los fallos individuales se toleran: el merge usa las cadenas
+          # que lograron leerse y excluye las demás.
+
+      - name: Generar precios.json
+        run: |
+          cd scripts
+          VERSION_BASE=$(python3 -c "import json; print(json.load(open('../precios.json'))['version'])")
+          echo "versión anterior: $VERSION_BASE"
+          VERSION_BASE=$VERSION_BASE python3 merge_real.py
+          cp precios-real.json ../precios.json
+
+      - name: Verificar salida
+        run: |
+          python3 - <<'EOF'
+          import json
+          d = json.load(open('precios.json'))
+          assert d.get('demo') is False, 'demo debe ser false'
+          assert d.get('version', 0) > 6, 'la version no avanzo'
+          assert len(d.get('productos', [])) >= 150, 'muy pocos productos con precio real'
+          assert len(d.get('sucursales', [])) >= 10, 'muy pocas sucursales'
+          for p in d['productos']:
+              assert p['pr'], 'producto sin precios: %s' % p['n']
+          print('OK v%(version)s: %(np)d productos, %(ns)d sucursales, fecha %(fecha)s' % {
+              'version': d['version'], 'np': len(d['productos']),
+              'ns': len(d['sucursales']), 'fecha': d['fecha']})
+          EOF
+
+      - name: Commit y push
+        run: |
+          git config user.name "neo-precios-bot"
+          git config user.email "neo-precios-bot@users.noreply.github.com"
+          git add precios.json
+          if git diff --staged --quiet; then
+            echo "sin cambios en precios.json"
+          else
+            git commit -m "Precios reales $(date +%F)"
+            git push
+          fi
